@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { can } from '@/lib/permissions';
 import {
   LayoutDashboard,
   FileText,
@@ -26,7 +27,7 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { user, logout, hasRole, hasPermission } = useAuth();
+  const { user, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -42,43 +43,43 @@ export default function AppLayout({ children }: AppLayoutProps) {
       title: 'Apply for Loan',
       icon: FileText,
       href: '/loan/apply',
-      show: hasPermission('loan.create'),
+      show: can(user, 'loan.create'),
     },
     {
       title: 'My Loans',
       icon: DollarSign,
       href: '/loans/my',
-      show: hasPermission('loan.view'),
+      show: can(user, 'loan.view'),
     },
     {
       title: 'Admin',
       icon: Shield,
       href: '#',
-      show: hasRole('Super Admin') || hasPermission('user.manage') || hasPermission('loan.approve'),
+      show: can(user, 'user.manage') || can(user, 'loan.approve') || can(user, 'role.manage') || can(user, 'permission.manage'),
       children: [
         {
           title: 'Loan Applications',
           icon: FileText,
           href: '/admin/loans',
-          show: hasPermission('loan.approve') || hasRole('Super Admin'),
+          show: can(user, 'loan.approve'),
         },
         {
           title: 'User Management',
           icon: Users,
           href: '/admin/users',
-          show: hasPermission('user.manage') || hasRole('Super Admin'),
+          show: can(user, 'user.manage'),
         },
         {
           title: 'Role Management',
           icon: Shield,
           href: '/admin/roles',
-          show: hasPermission('role.manage') || hasRole('Super Admin'),
+          show: can(user, 'role.manage'),
         },
         {
           title: 'Permission Management',
           icon: Key,
           href: '/admin/permissions',
-          show: hasPermission('permission.manage') || hasRole('Super Admin'),
+          show: can(user, 'permission.manage'),
         },
       ],
     },

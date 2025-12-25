@@ -75,18 +75,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const hasPermission = (permissionName: string): boolean => {
+    if (!user) return false;
+    
+    // Super Admin has all permissions
     if (hasRole('Super Admin')) return true;
     
-    // Check direct permissions
-    const hasDirectPermission = user?.permissions?.some((perm) => perm.name === permissionName) || false;
-    if (hasDirectPermission) return true;
-    
-    // Check permissions through roles
-    const hasRolePermission = user?.roles?.some(role => 
-      role.permissions?.some(perm => perm.name === permissionName)
-    ) || false;
-    
-    return hasRolePermission;
+    // Check in all_permissions array from backend (includes direct + role permissions)
+    return user.all_permissions?.includes(permissionName) || false;
   };
 
   return (

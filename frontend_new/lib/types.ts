@@ -4,6 +4,7 @@ export interface User {
   email: string;
   roles: Role[];
   permissions: Permission[];
+  all_permissions?: string[];
   created_at?: string;
   updated_at?: string;
 }

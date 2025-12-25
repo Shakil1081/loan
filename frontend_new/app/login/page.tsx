@@ -104,7 +104,7 @@ export default function LoginPage() {
           <div className="bg-white rounded-3xl shadow-2xl p-10 animate-fade-in">
             {/* Logo for mobile */}
             <div className="lg:hidden mb-8 text-center">
-              <div className="w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <div className="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-2xl font-bold text-slate-800">LoanHub Pro</h2>

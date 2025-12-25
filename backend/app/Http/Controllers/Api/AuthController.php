@@ -34,10 +34,18 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        // Load roles with permissions and direct permissions
+        $user->load('roles.permissions', 'permissions');
+        
+        // Get all permissions (direct + from roles)
+        $allPermissions = $user->getAllPermissions();
+        
         return response()->json([
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user->load('roles', 'permissions'),
+            'user' => array_merge($user->toArray(), [
+                'all_permissions' => $allPermissions->map(fn($p) => $p->name)->unique()->values()->toArray()
+            ]),
         ], 201);
     }
 
@@ -61,10 +69,18 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        // Load roles with permissions and direct permissions
+        $user->load('roles.permissions', 'permissions');
+        
+        // Get all permissions (direct + from roles)
+        $allPermissions = $user->getAllPermissions();
+        
         return response()->json([
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user->load('roles', 'permissions'),
+            'user' => array_merge($user->toArray(), [
+                'all_permissions' => $allPermissions->map(fn($p) => $p->name)->unique()->values()->toArray()
+            ]),
         ]);
     }
 
@@ -83,6 +99,14 @@ class AuthController extends Controller
      */
     public function me(Request $request)
     {
-        return response()->json($request->user()->load('roles', 'permissions'));
+        $user = $request->user();
+        $user->load('roles.permissions', 'permissions');
+        
+        // Get all permissions (direct + from roles)
+        $allPermissions = $user->getAllPermissions();
+        
+        return response()->json(array_merge($user->toArray(), [
+            'all_permissions' => $allPermissions->map(fn($p) => $p->name)->unique()->values()->toArray()
+        ]));
     }
 }
