@@ -11,7 +11,7 @@ class UpdatePermissionRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return $this->user()->can('permission.manage') || $this->user()->hasRole('Super Admin');
     }
 
     /**
@@ -21,8 +21,21 @@ class UpdatePermissionRequest extends FormRequest
      */
     public function rules(): array
     {
+        $permissionId = $this->route('permission');
+        
         return [
-            //
+            'name' => 'sometimes|required|string|max:255|unique:permissions,name,' . $permissionId,
+        ];
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Permission name is required',
+            'name.unique' => 'Permission name already exists',
         ];
     }
 }

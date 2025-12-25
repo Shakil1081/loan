@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\ResponseService;
+use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
+use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -33,7 +35,7 @@ class UserManagementController extends Controller
 
             $users = $query->paginate(15);
 
-            return response()->json($users);
+            return ResponseService::success(UserResource::collection($users)->response()->getData(true));
         } catch (\Exception $e) {
             return ResponseService::error('Failed to fetch users: ' . $e->getMessage(), null, 500);
         }
@@ -41,8 +43,12 @@ class UserManagementController extends Controller
 
     public function show($id)
     {
-        $user = User::with(['roles', 'permissions'])->findOrFail($id);
-        return response()->json($user);
+        try {
+            $user = User::with(['roles', 'permissions'])->findOrFail($id);
+            return ResponseService::success(new UserResource($user));
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to fetch user: ' . $e->getMessage(), null, 500);
+        }
     }
 
     public function store(Request $request)
@@ -74,7 +80,7 @@ class UserManagementController extends Controller
             }
 
             return ResponseService::success(
-                $user->load(['roles', 'permissions']),
+                new UserResource($user->load(['roles', 'permissions'])),
                 'User created successfully',
                 201
             );
@@ -159,13 +165,9 @@ class UserManagementController extends Controller
     public function assignRole(Request $request, $id)
     {
         try {
-            $validator = Validator::make($request->all(), [
+            $request->validate([
                 'role_id' => 'required|integer|exists:roles,id'
             ]);
-
-            if ($validator->fails()) {
-                return ResponseService::validationError($validator->errors());
-            }
 
             $user = User::findOrFail($id);
             $role = Role::findOrFail($request->role_id);

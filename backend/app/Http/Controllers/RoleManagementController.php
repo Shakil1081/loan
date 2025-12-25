@@ -36,8 +36,12 @@ class RoleManagementController extends Controller
 
     public function show($id)
     {
-        $role = Role::with('permissions')->findOrFail($id);
-        return response()->json($role);
+        try {
+            $role = Role::with('permissions')->findOrFail($id);
+            return ResponseService::success(new RoleResource($role));
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to fetch role: ' . $e->getMessage(), null, 500);
+        }
     }
 
     public function store(Request $request)
@@ -54,7 +58,7 @@ class RoleManagementController extends Controller
             $role = Role::create(['name' => $request->name]);
 
             return ResponseService::success(
-                $role->load('permissions'),
+                new RoleResource($role->load('permissions')),
                 'Role created successfully',
                 201
             );

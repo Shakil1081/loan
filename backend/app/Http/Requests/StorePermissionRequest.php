@@ -11,7 +11,7 @@ class StorePermissionRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return $this->user()->can('permission.manage') || $this->user()->hasRole('Super Admin');
     }
 
     /**
@@ -22,7 +22,19 @@ class StorePermissionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'name' => 'required|string|max:255|unique:permissions',
+            'guard_name' => 'sometimes|string|max:255',
+        ];
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Permission name is required',
+            'name.unique' => 'Permission name already exists',
         ];
     }
 }

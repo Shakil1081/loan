@@ -74,23 +74,15 @@ export default function UserManagementPage() {
           name: formData.name,
           email: formData.email,
           ...(formData.password && { password: formData.password }),
+          ...(formData.role_id && { role_id: parseInt(formData.role_id) }),
         });
-        if (formData.role_id) {
-          await axiosInstance.post(`/admin/users/${editingUser.id}/assign-role`, {
-            role_id: parseInt(formData.role_id),
-          });
-        }
       } else {
-        const response = await axiosInstance.post('/admin/users', {
+        await axiosInstance.post('/admin/users', {
           name: formData.name,
           email: formData.email,
           password: formData.password,
+          ...(formData.role_id && { role_id: parseInt(formData.role_id) }),
         });
-        if (formData.role_id) {
-          await axiosInstance.post(`/admin/users/${response.data.id}/assign-role`, {
-            role_id: parseInt(formData.role_id),
-          });
-        }
       }
       await fetchData();
       setShowModal(false);

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Services\ResponseService;
+use App\Http\Requests\StorePermissionRequest;
+use App\Http\Requests\UpdatePermissionRequest;
+use App\Http\Resources\PermissionResource;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Permission;
 
 class PermissionManagementController extends Controller
@@ -27,7 +29,7 @@ class PermissionManagementController extends Controller
 
             $permissions = $query->paginate(50);
 
-            return response()->json($permissions);
+            return ResponseService::success(PermissionResource::collection($permissions)->response()->getData(true));
         } catch (\Exception $e) {
             return ResponseService::error('Failed to fetch permissions: ' . $e->getMessage(), null, 500);
         }
@@ -35,8 +37,12 @@ class PermissionManagementController extends Controller
 
     public function show($id)
     {
-        $permission = Permission::findOrFail($id);
-        return response()->json($permission);
+        try {
+            $permission = Permission::findOrFail($id);
+            return ResponseService::success(new PermissionResource($permission));
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to fetch permission: ' . $e->getMessage(), null, 500);
+        }
     }
 
     public function store(Request $request)
@@ -57,7 +63,7 @@ class PermissionManagementController extends Controller
             ]);
 
             return ResponseService::success(
-                $permission,
+                new PermissionResource($permission),
                 'Permission created successfully',
                 201
             );
@@ -85,7 +91,7 @@ class PermissionManagementController extends Controller
             }
 
             return ResponseService::success(
-                $permission,
+                new PermissionResource($permission),
                 'Permission updated successfully'
             );
         } catch (\Exception $e) {

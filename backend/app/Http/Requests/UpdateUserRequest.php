@@ -11,7 +11,7 @@ class UpdateUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return $this->user()->can('user.manage') || $this->user()->hasRole('Super Admin');
     }
 
     /**
@@ -21,8 +21,28 @@ class UpdateUserRequest extends FormRequest
      */
     public function rules(): array
     {
+        $userId = $this->route('user');
+        
         return [
-            //
+            'name' => 'sometimes|required|string|max:255',
+            'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $userId,
+            'password' => 'sometimes|nullable|string|min:8',
+            'role_id' => 'sometimes|nullable|integer|exists:roles,id',
+        ];
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Name is required',
+            'email.required' => 'Email is required',
+            'email.email' => 'Email must be a valid email address',
+            'email.unique' => 'Email already exists',
+            'password.min' => 'Password must be at least 8 characters',
+            'role_id.exists' => 'Selected role does not exist',
         ];
     }
 }

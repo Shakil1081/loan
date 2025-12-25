@@ -11,7 +11,7 @@ class UpdateRoleRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return $this->user()->can('role.manage') || $this->user()->hasRole('Super Admin');
     }
 
     /**
@@ -21,8 +21,21 @@ class UpdateRoleRequest extends FormRequest
      */
     public function rules(): array
     {
+        $roleId = $this->route('role');
+        
         return [
-            //
+            'name' => 'sometimes|required|string|max:255|unique:roles,name,' . $roleId,
+        ];
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Role name is required',
+            'name.unique' => 'Role name already exists',
         ];
     }
 }
