@@ -101,7 +101,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Pending Loans */}
-          <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-amber-500">
+          <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6 border-l-4 border-amber-500">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm">Pending</p>
@@ -116,7 +116,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Approved Loans */}
-          <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-green-500">
+          <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6 border-l-4 border-green-500">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm">Approved</p>
@@ -131,7 +131,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Rejected Loans */}
-          <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-red-500">
+          <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6 border-l-4 border-red-500">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm">Rejected</p>
@@ -147,9 +147,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <Can perform="loan.create">
-            <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-emerald-500">
+            <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6 border-l-4 border-emerald-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-500 text-sm">Apply for Loan</p>
@@ -170,7 +170,7 @@ export default function DashboardPage() {
           </Can>
 
           <Can perform="loan.view">
-            <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-blue-500">
+            <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-500 text-sm">My Loans</p>
