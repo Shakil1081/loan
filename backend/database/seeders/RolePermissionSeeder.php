@@ -19,9 +19,19 @@ class RolePermissionSeeder extends Seeder
 
         // Create permissions
         $permissions = [
+            // Loan permissions
             'loan.view',
             'loan.create',
             'loan.approve',
+            
+            // User management permissions
+            'user.manage',
+            
+            // Role management permissions
+            'role.manage',
+            
+            // Permission management permissions
+            'permission.manage',
         ];
 
         foreach ($permissions as $permission) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ResponseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Role;
@@ -17,16 +18,20 @@ class RoleManagementController extends Controller
 
     public function index(Request $request)
     {
-        $query = Role::with('permissions');
+        try {
+            $query = Role::with('permissions');
 
-        if ($request->has('search')) {
-            $search = $request->input('search');
-            $query->where('name', 'like', "%{$search}%");
+            if ($request->has('search')) {
+                $search = $request->input('search');
+                $query->where('name', 'like', "%{$search}%");
+            }
+
+            $roles = $query->paginate(15);
+
+            return response()->json($roles);
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to fetch roles: ' . $e->getMessage(), null, 500);
         }
-
-        $roles = $query->paginate(10);
-
-        return response()->json($roles);
     }
 
     public function show($id)
@@ -37,104 +42,111 @@ class RoleManagementController extends Controller
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255|unique:roles',
-            'permissions' => 'sometimes|array',
-            'permissions.*' => 'exists:permissions,name'
-        ]);
+        try {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:255|unique:roles',
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            if ($validator->fails()) {
+                return ResponseService::validationError($validator->errors());
+            }
+
+            $role = Role::create(['name' => $request->name]);
+
+            return ResponseService::success(
+                $role->load('permissions'),
+                'Role created successfully',
+                201
+            );
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to create role: ' . $e->getMessage(), null, 500);
         }
-
-        $role = Role::create(['name' => $request->name]);
-
-        if ($request->has('permissions')) {
-            $role->syncPermissions($request->permissions);
-        }
-
-        return response()->json([
-            'message' => 'Role created successfully',
-            'role' => $role->load('permissions')
-        ], 201);
     }
 
     public function update(Request $request, $id)
     {
-        $role = Role::findOrFail($id);
+        try {
+            $role = Role::findOrFail($id);
 
-        // Prevent editing Super Admin role
-        if ($role->name === 'Super Admin') {
-            return response()->json(['message' => 'Cannot edit Super Admin role'], 403);
+            // Prevent editing Super Admin role
+            if ($role->name === 'Super Admin') {
+                return ResponseService::error('Cannot edit Super Admin role', null, 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'name' => 'sometimes|required|string|max:255|unique:roles,name,' . $id,
+            ]);
+
+            if ($validator->fails()) {
+                return ResponseService::validationError($validator->errors());
+            }
+
+            if ($request->has('name')) {
+                $role->name = $request->name;
+                $role->save();
+            }
+
+            return ResponseService::success(
+                $role->load('permissions'),
+                'Role updated successfully'
+            );
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to update role: ' . $e->getMessage(), null, 500);
         }
-
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|required|string|max:255|unique:roles,name,' . $id,
-            'permissions' => 'sometimes|array',
-            'permissions.*' => 'exists:permissions,name'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        if ($request->has('name')) {
-            $role->name = $request->name;
-            $role->save();
-        }
-
-        if ($request->has('permissions')) {
-            $role->syncPermissions($request->permissions);
-        }
-
-        return response()->json([
-            'message' => 'Role updated successfully',
-            'role' => $role->load('permissions')
-        ]);
     }
 
     public function destroy($id)
     {
-        $role = Role::findOrFail($id);
+        try {
+            $role = Role::findOrFail($id);
 
-        // Prevent deleting Super Admin or Applicant roles
-        if (in_array($role->name, ['Super Admin', 'Applicant'])) {
-            return response()->json(['message' => 'Cannot delete system roles'], 403);
+            // Prevent deleting Super Admin or Applicant roles
+            if (in_array($role->name, ['Super Admin', 'Applicant'])) {
+                return ResponseService::error('Cannot delete system roles', null, 403);
+            }
+
+            // Check if role is assigned to any users
+            if ($role->users()->count() > 0) {
+                return ResponseService::error('Cannot delete role that is assigned to users', null, 400);
+            }
+
+            $role->delete();
+
+            return ResponseService::success(null, 'Role deleted successfully');
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to delete role: ' . $e->getMessage(), null, 500);
         }
-
-        // Check if role is assigned to any users
-        if ($role->users()->count() > 0) {
-            return response()->json(['message' => 'Cannot delete role that is assigned to users'], 400);
-        }
-
-        $role->delete();
-
-        return response()->json(['message' => 'Role deleted successfully']);
     }
 
     public function assignPermissions(Request $request, $id)
     {
-        $role = Role::findOrFail($id);
+        try {
+            $role = Role::findOrFail($id);
 
-        // Prevent editing Super Admin role
-        if ($role->name === 'Super Admin') {
-            return response()->json(['message' => 'Cannot edit Super Admin role permissions'], 403);
+            // Prevent editing Super Admin role
+            if ($role->name === 'Super Admin') {
+                return ResponseService::error('Cannot edit Super Admin role permissions', null, 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'permissions' => 'required|array',
+                'permissions.*' => 'integer|exists:permissions,id'
+            ]);
+
+            if ($validator->fails()) {
+                return ResponseService::validationError($validator->errors());
+            }
+
+            // Get permission names from IDs
+            $permissions = Permission::whereIn('id', $request->permissions)->pluck('name')->toArray();
+            $role->syncPermissions($permissions);
+
+            return ResponseService::success(
+                $role->load('permissions'),
+                'Permissions assigned successfully'
+            );
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to assign permissions: ' . $e->getMessage(), null, 500);
         }
-
-        $validator = Validator::make($request->all(), [
-            'permissions' => 'required|array',
-            'permissions.*' => 'exists:permissions,name'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $role->syncPermissions($request->permissions);
-
-        return response()->json([
-            'message' => 'Permissions assigned successfully',
-            'role' => $role->load('permissions')
-        ]);
     }
 }

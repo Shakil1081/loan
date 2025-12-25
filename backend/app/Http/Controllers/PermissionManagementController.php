@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ResponseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Permission;
@@ -16,16 +17,20 @@ class PermissionManagementController extends Controller
 
     public function index(Request $request)
     {
-        $query = Permission::query();
+        try {
+            $query = Permission::query();
 
-        if ($request->has('search')) {
-            $search = $request->input('search');
-            $query->where('name', 'like', "%{$search}%");
+            if ($request->has('search')) {
+                $search = $request->input('search');
+                $query->where('name', 'like', "%{$search}%");
+            }
+
+            $permissions = $query->paginate(50);
+
+            return response()->json($permissions);
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to fetch permissions: ' . $e->getMessage(), null, 500);
         }
-
-        $permissions = $query->paginate(10);
-
-        return response()->json($permissions);
     }
 
     public function show($id)
@@ -36,89 +41,106 @@ class PermissionManagementController extends Controller
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255|unique:permissions',
-            'guard_name' => 'sometimes|string|max:255'
-        ]);
+        try {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:255|unique:permissions',
+                'guard_name' => 'sometimes|string|max:255'
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            if ($validator->fails()) {
+                return ResponseService::validationError($validator->errors());
+            }
+
+            $permission = Permission::create([
+                'name' => $request->name,
+                'guard_name' => $request->guard_name ?? 'web'
+            ]);
+
+            return ResponseService::success(
+                $permission,
+                'Permission created successfully',
+                201
+            );
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to create permission: ' . $e->getMessage(), null, 500);
         }
-
-        $permission = Permission::create([
-            'name' => $request->name,
-            'guard_name' => $request->guard_name ?? 'web'
-        ]);
-
-        return response()->json([
-            'message' => 'Permission created successfully',
-            'permission' => $permission
-        ], 201);
     }
 
     public function update(Request $request, $id)
     {
-        $permission = Permission::findOrFail($id);
+        try {
+            $permission = Permission::findOrFail($id);
 
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|required|string|max:255|unique:permissions,name,' . $id
-        ]);
+            $validator = Validator::make($request->all(), [
+                'name' => 'sometimes|required|string|max:255|unique:permissions,name,' . $id
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            if ($validator->fails()) {
+                return ResponseService::validationError($validator->errors());
+            }
+
+            if ($request->has('name')) {
+                $permission->name = $request->name;
+                $permission->save();
+            }
+
+            return ResponseService::success(
+                $permission,
+                'Permission updated successfully'
+            );
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to update permission: ' . $e->getMessage(), null, 500);
         }
-
-        if ($request->has('name')) {
-            $permission->name = $request->name;
-            $permission->save();
-        }
-
-        return response()->json([
-            'message' => 'Permission updated successfully',
-            'permission' => $permission
-        ]);
     }
 
     public function destroy($id)
     {
-        $permission = Permission::findOrFail($id);
+        try {
+            $permission = Permission::findOrFail($id);
 
-        // Prevent deleting core permissions
-        $corePermissions = [
-            'loan.create',
-            'loan.view',
-            'loan.approve',
-            'loan.delete',
-            'user.manage',
-            'role.manage',
-            'permission.manage'
-        ];
+            // Prevent deleting core permissions
+            $corePermissions = [
+                'loan.create',
+                'loan.view',
+                'loan.approve',
+                'loan.delete',
+                'user.manage',
+                'role.manage',
+                'permission.manage'
+            ];
 
-        if (in_array($permission->name, $corePermissions)) {
-            return response()->json(['message' => 'Cannot delete core system permissions'], 403);
+            if (in_array($permission->name, $corePermissions)) {
+                return ResponseService::error('Cannot delete core system permissions', null, 403);
+            }
+
+            $permission->delete();
+
+            return ResponseService::success(null, 'Permission deleted successfully');
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to delete permission: ' . $e->getMessage(), null, 500);
         }
-
-        $permission->delete();
-
-        return response()->json(['message' => 'Permission deleted successfully']);
     }
 
     public function getGrouped()
     {
-        $permissions = Permission::all();
-        $grouped = [];
+        try {
+            $permissions = Permission::all();
+            $grouped = [];
 
-        foreach ($permissions as $permission) {
-            $parts = explode('.', $permission->name);
-            $module = $parts[0] ?? 'general';
-            
-            if (!isset($grouped[$module])) {
-                $grouped[$module] = [];
+            foreach ($permissions as $permission) {
+                $parts = explode('.', $permission->name);
+                $module = $parts[0] ?? 'general';
+                
+                if (!isset($grouped[$module])) {
+                    $grouped[$module] = [];
+                }
+                
+                $grouped[$module][] = $permission;
             }
-            
-            $grouped[$module][] = $permission;
-        }
 
-        return response()->json($grouped);
+            return response()->json($grouped);
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to fetch grouped permissions: ' . $e->getMessage(), null, 500);
+        }
     }
 }

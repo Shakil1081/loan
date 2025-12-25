@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\ResponseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -19,19 +20,23 @@ class UserManagementController extends Controller
 
     public function index(Request $request)
     {
-        $query = User::with(['roles', 'permissions']);
+        try {
+            $query = User::with(['roles', 'permissions']);
 
-        if ($request->has('search')) {
-            $search = $request->input('search');
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
-            });
+            if ($request->has('search')) {
+                $search = $request->input('search');
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
+                });
+            }
+
+            $users = $query->paginate(15);
+
+            return response()->json($users);
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to fetch users: ' . $e->getMessage(), null, 500);
         }
-
-        $users = $query->paginate(10);
-
-        return response()->json($users);
     }
 
     public function show($id)
@@ -42,109 +47,137 @@ class UserManagementController extends Controller
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8',
-            'role' => 'required|string|exists:roles,name'
-        ]);
+        try {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|email|max:255|unique:users',
+                'password' => 'required|string|min:8',
+                'role_id' => 'nullable|integer|exists:roles,id'
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            if ($validator->fails()) {
+                return ResponseService::validationError($validator->errors());
+            }
+
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+            ]);
+
+            // Assign role if provided
+            if ($request->has('role_id') && $request->role_id) {
+                $role = Role::find($request->role_id);
+                if ($role) {
+                    $user->assignRole($role->name);
+                }
+            }
+
+            return ResponseService::success(
+                $user->load(['roles', 'permissions']),
+                'User created successfully',
+                201
+            );
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to create user: ' . $e->getMessage(), null, 500);
         }
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        $user->assignRole($request->role);
-
-        return response()->json([
-            'message' => 'User created successfully',
-            'user' => $user->load(['roles', 'permissions'])
-        ], 201);
     }
 
     public function update(Request $request, $id)
     {
-        $user = User::findOrFail($id);
+        try {
+            $user = User::findOrFail($id);
 
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $id,
-            'password' => 'sometimes|required|string|min:8',
-            'role' => 'sometimes|required|string|exists:roles,name'
-        ]);
+            $validator = Validator::make($request->all(), [
+                'name' => 'sometimes|required|string|max:255',
+                'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $id,
+                'password' => 'sometimes|nullable|string|min:8',
+                'role_id' => 'sometimes|nullable|integer|exists:roles,id'
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            if ($validator->fails()) {
+                return ResponseService::validationError($validator->errors());
+            }
+
+            if ($request->has('name')) {
+                $user->name = $request->name;
+            }
+
+            if ($request->has('email')) {
+                $user->email = $request->email;
+            }
+
+            if ($request->filled('password')) {
+                $user->password = Hash::make($request->password);
+            }
+
+            $user->save();
+
+            // Update role if provided
+            if ($request->has('role_id') && $request->role_id) {
+                $role = Role::find($request->role_id);
+                if ($role) {
+                    $user->syncRoles([$role->name]);
+                }
+            }
+
+            return ResponseService::success(
+                $user->load(['roles', 'permissions']),
+                'User updated successfully'
+            );
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to update user: ' . $e->getMessage(), null, 500);
         }
-
-        if ($request->has('name')) {
-            $user->name = $request->name;
-        }
-
-        if ($request->has('email')) {
-            $user->email = $request->email;
-        }
-
-        if ($request->has('password')) {
-            $user->password = Hash::make($request->password);
-        }
-
-        $user->save();
-
-        if ($request->has('role')) {
-            $user->syncRoles([$request->role]);
-        }
-
-        return response()->json([
-            'message' => 'User updated successfully',
-            'user' => $user->load(['roles', 'permissions'])
-        ]);
     }
 
     public function destroy($id)
     {
-        $user = User::findOrFail($id);
-        
-        // Prevent deleting self
-        if ($user->id === auth()->id()) {
-            return response()->json(['message' => 'Cannot delete yourself'], 400);
-        }
-
-        // Prevent deleting last Super Admin
-        if ($user->hasRole('Super Admin')) {
-            $superAdminCount = User::role('Super Admin')->count();
-            if ($superAdminCount <= 1) {
-                return response()->json(['message' => 'Cannot delete the last Super Admin'], 400);
+        try {
+            $user = User::findOrFail($id);
+            
+            // Prevent deleting self
+            if ($user->id === auth()->id()) {
+                return ResponseService::error('Cannot delete yourself', null, 400);
             }
+
+            // Prevent deleting last Super Admin
+            if ($user->hasRole('Super Admin')) {
+                $superAdminCount = User::role('Super Admin')->count();
+                if ($superAdminCount <= 1) {
+                    return ResponseService::error('Cannot delete the last Super Admin', null, 400);
+                }
+            }
+
+            $user->delete();
+
+            return ResponseService::success(null, 'User deleted successfully');
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to delete user: ' . $e->getMessage(), null, 500);
         }
-
-        $user->delete();
-
-        return response()->json(['message' => 'User deleted successfully']);
     }
 
     public function assignRole(Request $request, $id)
     {
-        $validator = Validator::make($request->all(), [
-            'role' => 'required|string|exists:roles,name'
-        ]);
+        try {
+            $validator = Validator::make($request->all(), [
+                'role_id' => 'required|integer|exists:roles,id'
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            if ($validator->fails()) {
+                return ResponseService::validationError($validator->errors());
+            }
+
+            $user = User::findOrFail($id);
+            $role = Role::findOrFail($request->role_id);
+            $user->syncRoles([$role->name]);
+
+            return ResponseService::success(
+                $user->load(['roles', 'permissions']),
+                'Role assigned successfully'
+            );
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to assign role: ' . $e->getMessage(), null, 500);
         }
-
-        $user = User::findOrFail($id);
-        $user->syncRoles([$request->role]);
-
-        return response()->json([
-            'message' => 'Role assigned successfully',
-            'user' => $user->load(['roles', 'permissions'])
-        ]);
     }
 
     public function assignPermissions(Request $request, $id)

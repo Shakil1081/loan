@@ -1,259 +1,170 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import TopNavLayout from '@/components/TopNavLayout'
-import axiosInstance from '@/lib/axios'
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import AppLayout from '@/components/AppLayout';
+import { Key, Plus, Edit, Trash2, X, Loader2, Search } from 'lucide-react';
+import axiosInstance from '@/lib/axios';
+import { Permission } from '@/lib/types';
 
-interface Permission {
-  id: number
-  name: string
-  guard_name: string
-  created_at: string
-  updated_at: string
-}
-
-interface GroupedPermissions {
-  [key: string]: Permission[]
-}
-
-export default function PermissionsManagementPage() {
-  const [permissions, setPermissions] = useState<Permission[]>([])
-  const [groupedPermissions, setGroupedPermissions] = useState<GroupedPermissions>({})
-  const [loading, setLoading] = useState(true)
-  const [selectedPermission, setSelectedPermission] = useState<Permission | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [formData, setFormData] = useState({
-    name: '',
-    guard_name: 'web'
-  })
-  const [updating, setUpdating] = useState(false)
+export default function PermissionManagementPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingPerm, setEditingPerm] = useState<Permission | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [formData, setFormData] = useState({ name: '' });
 
   useEffect(() => {
-    fetchPermissions()
-  }, [])
+    if (!authLoading && !user) {
+      router.push('/login');
+    } else if (user) {
+      fetchPermissions();
+    }
+  }, [user, authLoading, router]);
 
   const fetchPermissions = async () => {
-    setLoading(true)
     try {
-      const [listResponse, groupedResponse] = await Promise.all([
-        axiosInstance.get('/admin/permissions'),
-        axiosInstance.get('/admin/permissions-grouped')
-      ])
-      setPermissions(listResponse.data.data)
-      setGroupedPermissions(groupedResponse.data)
+      const response = await axiosInstance.get('/admin/permissions');
+      setPermissions(response.data.data || response.data || []);
     } catch (error) {
-      console.error('Failed to fetch permissions:', error)
+      console.error('Failed to fetch permissions:', error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const handleCreate = async () => {
-    setUpdating(true)
+  const openCreateModal = () => {
+    setEditingPerm(null);
+    setFormData({ name: '' });
+    setShowModal(true);
+  };
+
+  const openEditModal = (perm: Permission) => {
+    setEditingPerm(perm);
+    setFormData({ name: perm.name });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
     try {
-      await axiosInstance.post('/admin/permissions', formData)
-      await fetchPermissions()
-      setCreateModalOpen(false)
-      setFormData({ name: '', guard_name: 'web' })
+      if (editingPerm) {
+        await axiosInstance.put(`/admin/permissions/${editingPerm.id}`, formData);
+      } else {
+        await axiosInstance.post('/admin/permissions', formData);
+      }
+      await fetchPermissions();
+      setShowModal(false);
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to create permission')
+      alert(error.response?.data?.message || 'Failed to save permission');
     } finally {
-      setUpdating(false)
+      setSaving(false);
     }
-  }
+  };
 
-  const handleUpdate = async () => {
-    if (!selectedPermission) return
-    setUpdating(true)
+  const deletePermission = async (permId: number) => {
+    if (!confirm('Are you sure you want to delete this permission?')) return;
     try {
-      await axiosInstance.put(`/admin/permissions/${selectedPermission.id}`, formData)
-      await fetchPermissions()
-      setModalOpen(false)
-      setSelectedPermission(null)
-      setFormData({ name: '', guard_name: 'web' })
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to update permission')
-    } finally {
-      setUpdating(false)
+      await axiosInstance.delete(`/admin/permissions/${permId}`);
+      await fetchPermissions();
+    } catch (error) {
+      console.error('Failed to delete permission:', error);
     }
-  }
+  };
 
-  const handleDelete = async (permissionId: number) => {
-    if (!confirm('Are you sure you want to delete this permission?')) return
-    try {
-      await axiosInstance.delete(`/admin/permissions/${permissionId}`)
-      await fetchPermissions()
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to delete permission')
-    }
-  }
+  const filteredPermissions = permissions.filter(perm =>
+    perm.name.toLowerCase().includes(search.toLowerCase())
+  );
 
-  const openEditModal = (permission: Permission) => {
-    setSelectedPermission(permission)
-    setFormData({
-      name: permission.name,
-      guard_name: permission.guard_name
-    })
-    setModalOpen(true)
-  }
+  // Group permissions by module
+  const groupedPermissions = filteredPermissions.reduce((acc, perm) => {
+    const module = perm.name.split('.')[0] || 'other';
+    if (!acc[module]) acc[module] = [];
+    acc[module].push(perm);
+    return acc;
+  }, {} as Record<string, Permission[]>);
 
-  const getModuleIcon = (module: string) => {
-    switch (module) {
-      case 'loan':
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        )
-      case 'user':
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        )
-      case 'role':
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-        )
-      case 'permission':
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-          </svg>
-        )
-      default:
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        )
-    }
-  }
-
-  const getModuleColor = (module: string) => {
-    switch (module) {
-      case 'loan':
-        return 'from-green-500 to-emerald-600'
-      case 'user':
-        return 'from-blue-500 to-indigo-600'
-      case 'role':
-        return 'from-purple-500 to-pink-600'
-      case 'permission':
-        return 'from-amber-500 to-orange-600'
-      default:
-        return 'from-gray-500 to-slate-600'
-    }
-  }
-
-  const isSystemPermission = (name: string) => {
-    const corePermissions = [
-      'loan.create', 'loan.view', 'loan.approve', 'loan.delete',
-      'user.manage', 'role.manage', 'permission.manage'
-    ]
-    return corePermissions.includes(name)
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
   return (
-    <TopNavLayout>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <AppLayout>
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Permission Management</h1>
-            <p className="text-slate-500 mt-1">Manage system permissions and access controls</p>
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">Permission Management</h1>
+            <p className="text-slate-500">Manage system permissions</p>
           </div>
           <button
-            onClick={() => setCreateModalOpen(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-white font-semibold rounded-xl transition-all duration-200 transform hover:-translate-y-0.5"
-            style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+            onClick={openCreateModal}
+            className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
+            <Plus className="w-5 h-5" />
             Add Permission
           </button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-4">
-          {Object.keys(groupedPermissions).map((module) => (
-            <div key={module} className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${getModuleColor(module)} flex items-center justify-center text-white`}>
-                  {getModuleIcon(module)}
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-800">{groupedPermissions[module]?.length || 0}</p>
-                  <p className="text-xs text-slate-500 capitalize">{module} Permissions</p>
-                </div>
-              </div>
-            </div>
-          ))}
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search permissions..."
+              className="w-full pl-12 pr-4 py-3 border-2 border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
         </div>
 
-        {/* Permissions by Module */}
+        {/* Permissions List */}
         {loading ? (
-          <div className="bg-white rounded-2xl border border-slate-100 p-12">
-            <div className="flex flex-col items-center justify-center">
-              <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-              <p className="mt-4 text-slate-500">Loading permissions...</p>
-            </div>
+          <div className="text-center py-12">
+            <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto"></div>
           </div>
         ) : (
           <div className="space-y-6">
-            {Object.entries(groupedPermissions).map(([module, modulePermissions]) => (
-              <div key={module} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className={`px-6 py-3 bg-gradient-to-r ${getModuleColor(module)}`}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-white">
-                      {getModuleIcon(module)}
-                    </div>
-                    <h3 className="text-lg font-bold text-white capitalize">{module} Module</h3>
-                    <span className="ml-auto px-3 py-1 bg-white/20 rounded-full text-white text-sm">
-                      {modulePermissions.length} permissions
-                    </span>
-                  </div>
+            {Object.entries(groupedPermissions).map(([module, perms]) => (
+              <div key={module} className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4">
+                  <h3 className="text-lg font-bold text-white capitalize flex items-center gap-2">
+                    <Key className="w-5 h-5" />
+                    {module} Permissions
+                  </h3>
                 </div>
                 <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {modulePermissions.map((permission) => (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {perms.map((perm) => (
                       <div
-                        key={permission.id}
-                        className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                        key={perm.id}
+                        className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-700">{permission.name}</p>
-                            <p className="text-xs text-slate-400">Guard: {permission.guard_name}</p>
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                            <Key className="w-4 h-4 text-indigo-600" />
                           </div>
+                          <span className="font-medium text-slate-700">{perm.name}</span>
                         </div>
-                        {!isSystemPermission(permission.name) && (
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => openEditModal(permission)}
-                              className="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleDelete(permission.id)}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                        {isSystemPermission(permission.name) && (
-                          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">System</span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => openEditModal(perm)} className="p-1.5 text-slate-600 hover:bg-white rounded-lg">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => deletePermission(perm.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -263,98 +174,42 @@ export default function PermissionsManagementPage() {
           </div>
         )}
 
-        {/* Create Permission Modal */}
-        {createModalOpen && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-screen items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={() => setCreateModalOpen(false)}></div>
-              <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fadeIn">
-                <h3 className="text-xl font-bold text-slate-800 mb-4">Create New Permission</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Permission Name</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="e.g., module.action"
-                    />
-                    <p className="text-xs text-slate-400 mt-1">Format: module.action (e.g., user.edit, report.view)</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Guard Name</label>
-                    <select
-                      value={formData.guard_name}
-                      onChange={(e) => setFormData({ ...formData, guard_name: e.target.value })}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="web">Web</option>
-                      <option value="api">API</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-6">
-                  <button
-                    onClick={() => setCreateModalOpen(false)}
-                    className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-600 font-medium hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreate}
-                    disabled={updating}
-                    className="flex-1 py-2 px-4 text-white font-medium rounded-lg disabled:opacity-50"
-                    style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
-                  >
-                    {updating ? 'Creating...' : 'Create Permission'}
-                  </button>
-                </div>
+        {/* Modal */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+              <div className="flex items-center justify-between p-6 border-b border-slate-200">
+                <h3 className="text-xl font-bold text-slate-800">{editingPerm ? 'Edit Permission' : 'Create Permission'}</h3>
+                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-6 h-6" />
+                </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Permission Modal */}
-        {modalOpen && selectedPermission && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-screen items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={() => setModalOpen(false)}></div>
-              <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fadeIn">
-                <h3 className="text-xl font-bold text-slate-800 mb-4">Edit Permission</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Permission Name</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="e.g., module.action"
-                    />
-                  </div>
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Permission Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                    placeholder="e.g., loan.create, user.manage"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Use format: module.action (e.g., loan.create)</p>
                 </div>
-                <div className="flex gap-3 mt-6">
-                  <button
-                    onClick={() => setModalOpen(false)}
-                    className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-600 font-medium hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleUpdate}
-                    disabled={updating}
-                    className="flex-1 py-2 px-4 text-white font-medium rounded-lg disabled:opacity-50"
-                    style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
-                  >
-                    {updating ? 'Updating...' : 'Update Permission'}
-                  </button>
-                </div>
-              </div>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                  {editingPerm ? 'Update Permission' : 'Create Permission'}
+                </button>
+              </form>
             </div>
           </div>
         )}
       </div>
-    </TopNavLayout>
-  )
+    </AppLayout>
+  );
 }
