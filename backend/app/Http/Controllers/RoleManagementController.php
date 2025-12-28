@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Services\ResponseService;
+use App\Http\Requests\StoreRoleRequest;
+use App\Http\Requests\UpdateRoleRequest;
+use App\Http\Resources\RoleResource;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -19,16 +22,21 @@ class RoleManagementController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Role::with('permissions');
+            $search = $request->get('search', '');
+            $page = $request->get('page', 1);
+            $cacheKey = "roles_page_{$page}_search_" . md5($search);
 
-            if ($request->has('search')) {
-                $search = $request->input('search');
-                $query->where('name', 'like', "%{$search}%");
-            }
+            $roles = Cache::remember($cacheKey, 300, function () use ($search) {
+                $query = Role::with('permissions');
 
-            $roles = $query->paginate(15);
+                if ($search) {
+                    $query->where('name', 'like', "%{$search}%");
+                }
 
-            return response()->json($roles);
+                return $query->paginate(15);
+            });
+
+            return ResponseService::success(RoleResource::collection($roles)->response()->getData(true));
         } catch (\Exception $e) {
             return ResponseService::error('Failed to fetch roles: ' . $e->getMessage(), null, 500);
         }
@@ -44,18 +52,13 @@ class RoleManagementController extends Controller
         }
     }
 
-    public function store(Request $request)
+    public function store(StoreRoleRequest $request)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255|unique:roles',
-            ]);
-
-            if ($validator->fails()) {
-                return ResponseService::validationError($validator->errors());
-            }
-
             $role = Role::create(['name' => $request->name]);
+
+            // Clear roles cache
+            Cache::tags(['roles'])->flush();
 
             return ResponseService::success(
                 new RoleResource($role->load('permissions')),
@@ -67,7 +70,7 @@ class RoleManagementController extends Controller
         }
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdateRoleRequest $request, $id)
     {
         try {
             $role = Role::findOrFail($id);
@@ -77,21 +80,16 @@ class RoleManagementController extends Controller
                 return ResponseService::error('Cannot edit Super Admin role', null, 403);
             }
 
-            $validator = Validator::make($request->all(), [
-                'name' => 'sometimes|required|string|max:255|unique:roles,name,' . $id,
-            ]);
-
-            if ($validator->fails()) {
-                return ResponseService::validationError($validator->errors());
-            }
-
             if ($request->has('name')) {
                 $role->name = $request->name;
                 $role->save();
             }
 
+            // Clear roles cache
+            Cache::tags(['roles'])->flush();
+
             return ResponseService::success(
-                $role->load('permissions'),
+                new RoleResource($role->load('permissions')),
                 'Role updated successfully'
             );
         } catch (\Exception $e) {
@@ -116,6 +114,9 @@ class RoleManagementController extends Controller
 
             $role->delete();
 
+            // Clear roles cache
+            Cache::tags(['roles'])->flush();
+
             return ResponseService::success(null, 'Role deleted successfully');
         } catch (\Exception $e) {
             return ResponseService::error('Failed to delete role: ' . $e->getMessage(), null, 500);
@@ -132,21 +133,20 @@ class RoleManagementController extends Controller
                 return ResponseService::error('Cannot edit Super Admin role permissions', null, 403);
             }
 
-            $validator = Validator::make($request->all(), [
+            $request->validate([
                 'permissions' => 'required|array',
                 'permissions.*' => 'integer|exists:permissions,id'
             ]);
-
-            if ($validator->fails()) {
-                return ResponseService::validationError($validator->errors());
-            }
 
             // Get permission names from IDs
             $permissions = Permission::whereIn('id', $request->permissions)->pluck('name')->toArray();
             $role->syncPermissions($permissions);
 
+            // Clear roles cache
+            Cache::tags(['roles'])->flush();
+
             return ResponseService::success(
-                $role->load('permissions'),
+                new RoleResource($role->load('permissions')),
                 'Permissions assigned successfully'
             );
         } catch (\Exception $e) {

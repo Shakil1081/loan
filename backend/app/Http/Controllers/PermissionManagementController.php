@@ -7,6 +7,7 @@ use App\Http\Requests\StorePermissionRequest;
 use App\Http\Requests\UpdatePermissionRequest;
 use App\Http\Resources\PermissionResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Permission;
 
 class PermissionManagementController extends Controller
@@ -120,6 +121,9 @@ class PermissionManagementController extends Controller
             }
 
             $permission->delete();
+
+            // Clear permissions cache
+            Cache::tags(['permissions'])->flush();
 
             return ResponseService::success(null, 'Permission deleted successfully');
         } catch (\Exception $e) {

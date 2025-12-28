@@ -20,6 +20,50 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: loan_backend
+    ports:
+      - "8000:80"
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=loan_db
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=password
+      - APP_ENV=production
+      - APP_DEBUG=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - loan_network
+    volumes:
+      - ./backend:/var/www
+      - /var/www/vendor
+      - /var/www/node_modules
+    command: >
+      sh -c "php artisan migrate --force &&
+             php artisan db:seed --force &&
+             /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"
+
+  frontend:
+    build:
+      context: ./frontend_new
+      dockerfile: Dockerfile
+    container_name: loan_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+    depends_on:
+      - backend
+    networks:
+      - loan_network
+
 volumes:
   postgres_data:
 

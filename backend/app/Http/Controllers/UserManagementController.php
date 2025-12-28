@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -23,17 +24,22 @@ class UserManagementController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = User::with(['roles', 'permissions']);
+            $search = $request->get('search', '');
+            $page = $request->get('page', 1);
+            $cacheKey = "users_page_{$page}_search_" . md5($search);
 
-            if ($request->has('search')) {
-                $search = $request->input('search');
-                $query->where(function($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
-                });
-            }
+            $users = Cache::remember($cacheKey, 300, function () use ($search) {
+                $query = User::with(['roles', 'permissions']);
 
-            $users = $query->paginate(15);
+                if ($search) {
+                    $query->where(function($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%");
+                    });
+                }
+
+                return $query->paginate(15);
+            });
 
             return ResponseService::success(UserResource::collection($users)->response()->getData(true));
         } catch (\Exception $e) {
@@ -78,6 +84,9 @@ class UserManagementController extends Controller
                     $user->assignRole($role->name);
                 }
             }
+
+            // Clear users cache
+            Cache::forget('users_*');
 
             return ResponseService::success(
                 new UserResource($user->load(['roles', 'permissions'])),
@@ -127,8 +136,11 @@ class UserManagementController extends Controller
                 }
             }
 
+            // Clear users cache
+            Cache::tags(['users'])->flush();
+
             return ResponseService::success(
-                $user->load(['roles', 'permissions']),
+                new UserResource($user->load(['roles', 'permissions'])),
                 'User updated successfully'
             );
         } catch (\Exception $e) {
@@ -155,6 +167,9 @@ class UserManagementController extends Controller
             }
 
             $user->delete();
+
+            // Clear users cache
+            Cache::tags(['users'])->flush();
 
             return ResponseService::success(null, 'User deleted successfully');
         } catch (\Exception $e) {
