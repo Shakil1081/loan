@@ -2,17 +2,17 @@
 
 A modern, full-featured loan management application built with Next.js 15, TypeScript, and Tailwind CSS. Features a beautiful UI with proper spacing, eye-catching gradients, and seamless integration with Laravel backend API.
 
-## ✨ Features
+##  Features
 
-- 🎨 **Modern UI Design** - Eye-catching gradients, smooth animations, and premium fintech aesthetics
-- 🔐 **Authentication System** - Secure login/logout with role-based access control
-- 📊 **Dashboard** - Beautiful stats cards, quick actions, and recent loan overview
-- 💼 **Loan Management** - Apply for loans, track applications, admin approval workflow
-- 👥 **User Management** - Admin panel for managing users, roles, and permissions
-- 📱 **Responsive Design** - Works perfectly on desktop, tablet, and mobile devices
-- ⚡ **Performance Optimized** - Fast page loads with Next.js App Router
+-  **Modern UI Design** - Eye-catching gradients, smooth animations, and premium fintech aesthetics
+-  **Authentication System** - Secure login/logout with role-based access control
+-  **Dashboard** - Beautiful stats cards, quick actions, and recent loan overview
+-  **Loan Management** - Apply for loans, track applications, admin approval workflow
+-  **User Management** - Admin panel for managing users, roles, and permissions
+-  **Responsive Design** - Works perfectly on desktop, tablet, and mobile devices
+-  **Performance Optimized** - Fast page loads with Next.js App Router
 
-## 🚀 Getting Started
+##  Getting Started
 
 ## Getting Started
 
