@@ -38,6 +38,11 @@ export default function ApplyLoanPage() {
       });
       setSuccess(true);
       setFormData({ amount: '', tenure: 12, purpose: '' });
+      
+      // Redirect to dashboard after 2 seconds
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 2000);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to submit loan application');
     } finally {
