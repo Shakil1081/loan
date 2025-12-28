@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\ResponseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -39,14 +41,12 @@ class AuthController extends Controller
         
         // Get all permissions (direct + from roles)
         $allPermissions = $user->getAllPermissions();
+        $user->all_permissions = $allPermissions->map(fn($p) => $p->name)->unique()->values()->toArray();
         
-        return response()->json([
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => array_merge($user->toArray(), [
-                'all_permissions' => $allPermissions->map(fn($p) => $p->name)->unique()->values()->toArray()
-            ]),
-        ], 201);
+        return ResponseService::success([
+            'user' => new UserResource($user),
+            'token' => $token,
+        ], 'User registered successfully', 201);
     }
 
     /**
@@ -62,9 +62,7 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
-            ]);
+            return ResponseService::error('The provided credentials are incorrect.', null, 401);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -74,14 +72,13 @@ class AuthController extends Controller
         
         // Get all permissions (direct + from roles)
         $allPermissions = $user->getAllPermissions();
+        $user->all_permissions = $allPermissions->map(fn($p) => $p->name)->unique()->values()->toArray();
         
-        return response()->json([
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => array_merge($user->toArray(), [
-                'all_permissions' => $allPermissions->map(fn($p) => $p->name)->unique()->values()->toArray()
-            ]),
-        ]);
+        return ResponseService::success([
+            'user' => new UserResource($user),
+            'token' => $token,
+            'permissions' => $user->all_permissions,
+        ], 'Login successful');
     }
 
     /**
@@ -104,9 +101,8 @@ class AuthController extends Controller
         
         // Get all permissions (direct + from roles)
         $allPermissions = $user->getAllPermissions();
+        $user->all_permissions = $allPermissions->map(fn($p) => $p->name)->unique()->values()->toArray();
         
-        return response()->json(array_merge($user->toArray(), [
-            'all_permissions' => $allPermissions->map(fn($p) => $p->name)->unique()->values()->toArray()
-        ]));
+        return ResponseService::success(new UserResource($user));
     }
 }

@@ -46,7 +46,7 @@ class RolePermissionSeeder extends Seeder
         // Super Admin gets all permissions
         $superAdmin->givePermissionTo(Permission::all());
 
-        // Applicant can view and create loans
-        $applicant->givePermissionTo(['loan.view', 'loan.create']);
+        // Applicant can only create loans (can view own loans via policy)
+        $applicant->givePermissionTo(['loan.create']);
     }
 }

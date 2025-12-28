@@ -57,20 +57,9 @@ class UserManagementController extends Controller
         }
     }
 
-    public function store(Request $request)
+    public function store(StoreUserRequest $request)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users',
-                'password' => 'required|string|min:8',
-                'role_id' => 'nullable|integer|exists:roles,id'
-            ]);
-
-            if ($validator->fails()) {
-                return ResponseService::validationError($validator->errors());
-            }
-
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
@@ -98,21 +87,10 @@ class UserManagementController extends Controller
         }
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdateUserRequest $request, $id)
     {
         try {
             $user = User::findOrFail($id);
-
-            $validator = Validator::make($request->all(), [
-                'name' => 'sometimes|required|string|max:255',
-                'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $id,
-                'password' => 'sometimes|nullable|string|min:8',
-                'role_id' => 'sometimes|nullable|integer|exists:roles,id'
-            ]);
-
-            if ($validator->fails()) {
-                return ResponseService::validationError($validator->errors());
-            }
 
             if ($request->has('name')) {
                 $user->name = $request->name;
@@ -137,7 +115,7 @@ class UserManagementController extends Controller
             }
 
             // Clear users cache
-            Cache::tags(['users'])->flush();
+            Cache::flush();
 
             return ResponseService::success(
                 new UserResource($user->load(['roles', 'permissions'])),
@@ -169,7 +147,7 @@ class UserManagementController extends Controller
             $user->delete();
 
             // Clear users cache
-            Cache::tags(['users'])->flush();
+            Cache::flush();
 
             return ResponseService::success(null, 'User deleted successfully');
         } catch (\Exception $e) {
@@ -199,21 +177,21 @@ class UserManagementController extends Controller
 
     public function assignPermissions(Request $request, $id)
     {
-        $validator = Validator::make($request->all(), [
-            'permissions' => 'required|array',
-            'permissions.*' => 'exists:permissions,name'
-        ]);
+        try {
+            $request->validate([
+                'permissions' => 'required|array',
+                'permissions.*' => 'exists:permissions,name'
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            $user = User::findOrFail($id);
+            $user->syncPermissions($request->permissions);
+
+            return ResponseService::success(
+                new UserResource($user->load(['roles', 'permissions'])),
+                'Permissions assigned successfully'
+            );
+        } catch (\Exception $e) {
+            return ResponseService::error('Failed to assign permissions: ' . $e->getMessage(), null, 500);
         }
-
-        $user = User::findOrFail($id);
-        $user->syncPermissions($request->permissions);
-
-        return response()->json([
-            'message' => 'Permissions assigned successfully',
-            'user' => $user->load(['roles', 'permissions'])
-        ]);
     }
 }

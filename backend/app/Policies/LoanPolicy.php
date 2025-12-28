@@ -21,7 +21,13 @@ class LoanPolicy
      */
     public function view(User $user, Loan $loan): bool
     {
-        return $user->can('loan.view') || $loan->user_id === $user->id;
+        // Admins can view all loans
+        if ($user->can('loan.view')) {
+            return true;
+        }
+        
+        // Users can only view their own loans
+        return $loan->user_id === $user->id;
     }
 
     /**

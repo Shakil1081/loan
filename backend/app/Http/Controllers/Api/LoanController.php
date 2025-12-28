@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Loan;
+use App\Services\ResponseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -12,7 +13,7 @@ class LoanController extends Controller
     /**
      * Submit a new loan application (Applicant)
      */
-    public function store(Request $request)
+    public function apply(Request $request)
     {
         $this->authorize('create', Loan::class);
 
@@ -23,11 +24,15 @@ class LoanController extends Controller
         ]);
 
         $loan = $request->user()->loans()->create($validated);
+        
+        // Refresh to get default values from database
+        $loan->refresh();
 
-        return response()->json([
-            'message' => 'Loan application submitted successfully',
-            'loan' => $loan->load('user')
-        ], 201);
+        return ResponseService::success(
+            $loan->load('user'),
+            'Loan application submitted successfully',
+            201
+        );
     }
 
     /**
@@ -38,9 +43,9 @@ class LoanController extends Controller
         $loans = $request->user()->loans()
             ->with(['user', 'creator', 'updater'])
             ->orderBy('created_at', 'desc')
-            ->paginate(10);
+            ->get();
 
-        return response()->json($loans);
+        return ResponseService::success($loans);
     }
 
     /**
@@ -81,10 +86,10 @@ class LoanController extends Controller
         // Clear cache when loan status is updated
         Cache::flush();
 
-        return response()->json([
-            'message' => 'Loan status updated successfully',
-            'loan' => $loan->load('user', 'creator', 'updater')
-        ]);
+        return ResponseService::success(
+            $loan->load('user', 'creator', 'updater'),
+            'Loan status updated successfully'
+        );
     }
 
     /**
@@ -96,6 +101,6 @@ class LoanController extends Controller
         
         $this->authorize('view', $loan);
 
-        return response()->json($loan);
+        return ResponseService::success($loan);
     }
 }

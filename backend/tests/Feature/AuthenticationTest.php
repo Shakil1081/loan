@@ -13,7 +13,9 @@ class AuthenticationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->artisan('db:seed', ['--class' => 'RolePermissionSeeder']);
+        
+        // Seed roles and permissions
+        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
     }
 
     public function test_user_can_register_successfully()
@@ -60,6 +62,7 @@ class AuthenticationTest extends TestCase
             'email' => 'test@example.com',
             'password' => bcrypt('Password123!')
         ]);
+        $user->assignRole('Applicant');
 
         $response = $this->postJson('/api/login', [
             'email' => 'test@example.com',
@@ -80,10 +83,11 @@ class AuthenticationTest extends TestCase
 
     public function test_user_cannot_login_with_invalid_credentials()
     {
-        User::factory()->create([
+        $user = User::factory()->create([
             'email' => 'test@example.com',
             'password' => bcrypt('Password123!')
         ]);
+        $user->assignRole('Applicant');
 
         $response = $this->postJson('/api/login', [
             'email' => 'test@example.com',

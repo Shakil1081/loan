@@ -21,7 +21,7 @@ class LoanManagementTest extends TestCase
         parent::setUp();
         
         // Seed roles and permissions
-        $this->artisan('db:seed', ['--class' => 'RolePermissionSeeder']);
+        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
 
         // Create applicant user
         $this->applicant = User::factory()->create(['email' => 'applicant@test.com']);
@@ -99,6 +99,7 @@ class LoanManagementTest extends TestCase
     public function test_applicant_cannot_view_other_users_loans()
     {
         $otherUser = User::factory()->create();
+        $otherUser->assignRole('Applicant');
         $loan = Loan::factory()->create(['user_id' => $otherUser->id]);
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $this->applicantToken)

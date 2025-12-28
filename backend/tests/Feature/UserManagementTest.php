@@ -18,7 +18,8 @@ class UserManagementTest extends TestCase
     {
         parent::setUp();
         
-        $this->artisan('db:seed', ['--class' => 'RolePermissionSeeder']);
+        // Seed roles and permissions
+        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
 
         $this->admin = User::factory()->create();
         $this->admin->assignRole('Super Admin');

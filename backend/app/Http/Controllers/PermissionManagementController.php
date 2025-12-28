@@ -73,18 +73,10 @@ class PermissionManagementController extends Controller
         }
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdatePermissionRequest $request, $id)
     {
         try {
             $permission = Permission::findOrFail($id);
-
-            $validator = Validator::make($request->all(), [
-                'name' => 'sometimes|required|string|max:255|unique:permissions,name,' . $id
-            ]);
-
-            if ($validator->fails()) {
-                return ResponseService::validationError($validator->errors());
-            }
 
             if ($request->has('name')) {
                 $permission->name = $request->name;

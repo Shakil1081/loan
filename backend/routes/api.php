@@ -27,26 +27,24 @@ Route::post('/login', [AuthController::class, 'login']);
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     // Auth routes
-    Route::get('/me', function (Request $request) {
-        return $request->user();
-    });
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/profile', [AuthController::class, 'me']);
+    Route::get('/me', [AuthController::class, 'me']);
     
     // Profile management
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::post('/change-password', [ProfileController::class, 'changePassword']);
-    Route::get('/me', [AuthController::class, 'me']);
     
     // Loan routes
-    Route::post('/loans', [LoanController::class, 'store']);
-    Route::get('/loans/my-loans', [LoanController::class, 'myLoans']);
+    Route::post('/loans/apply', [LoanController::class, 'apply']);
+    Route::get('/loans', [LoanController::class, 'myLoans']);
     Route::get('/loans/{id}', [LoanController::class, 'show']);
     
     // Admin routes
     Route::prefix('admin')->group(function () {
         // Loan management
         Route::get('/loans', [LoanController::class, 'index']);
-        Route::put('/loans/{id}/status', [LoanController::class, 'updateStatus']);
+        Route::patch('/loans/{id}/status', [LoanController::class, 'updateStatus']);
         
         // User management
         Route::apiResource('users', UserManagementController::class);

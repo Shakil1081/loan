@@ -58,7 +58,7 @@ class RoleManagementController extends Controller
             $role = Role::create(['name' => $request->name]);
 
             // Clear roles cache
-            Cache::tags(['roles'])->flush();
+            Cache::flush();
 
             return ResponseService::success(
                 new RoleResource($role->load('permissions')),
@@ -86,7 +86,7 @@ class RoleManagementController extends Controller
             }
 
             // Clear roles cache
-            Cache::tags(['roles'])->flush();
+            Cache::flush();
 
             return ResponseService::success(
                 new RoleResource($role->load('permissions')),
@@ -115,7 +115,7 @@ class RoleManagementController extends Controller
             $role->delete();
 
             // Clear roles cache
-            Cache::tags(['roles'])->flush();
+            Cache::flush();
 
             return ResponseService::success(null, 'Role deleted successfully');
         } catch (\Exception $e) {
@@ -143,7 +143,7 @@ class RoleManagementController extends Controller
             $role->syncPermissions($permissions);
 
             // Clear roles cache
-            Cache::tags(['roles'])->flush();
+            Cache::flush();
 
             return ResponseService::success(
                 new RoleResource($role->load('permissions')),
