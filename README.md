@@ -65,7 +65,7 @@ A comprehensive loan management system built with Laravel (Backend) and Next.js 
   - Role and permission management
   - Search and filter capabilities
 
-## 🛠 Technology Stack
+##  Technology Stack
 
 ### Backend
 - **Framework:** Laravel 11.x
@@ -221,7 +221,7 @@ Key configuration files:
 - `frontend_new/next.config.mjs` - Next.js configuration
 - `frontend_new/tailwind.config.ts` - Tailwind CSS configuration
 
-## 🗄 Database Setup
+##  Database Setup
 
 ### Migrations
 
