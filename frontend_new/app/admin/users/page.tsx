@@ -35,14 +35,43 @@ export default function UserManagementPage() {
 
   const fetchData = async () => {
     try {
+      console.log('Fetching users and roles...');
       const [usersRes, rolesRes] = await Promise.all([
         axiosInstance.get('/admin/users'),
         axiosInstance.get('/admin/roles'),
       ]);
-      setUsers(usersRes.data.data || usersRes.data || []);
-      setRoles(rolesRes.data.data || rolesRes.data || []);
-    } catch (error) {
+      console.log('Users response:', usersRes.data);
+      console.log('Roles response:', rolesRes.data);
+      
+      // Handle ResponseService format: { success: true, data: { data: [...], ... } }
+      // Extract the actual array from pagination
+      let userData = [];
+      if (usersRes.data.data) {
+        userData = Array.isArray(usersRes.data.data) 
+          ? usersRes.data.data 
+          : (usersRes.data.data.data || []);
+      } else if (Array.isArray(usersRes.data)) {
+        userData = usersRes.data;
+      }
+      
+      let roleData = [];
+      if (rolesRes.data.data) {
+        roleData = Array.isArray(rolesRes.data.data) 
+          ? rolesRes.data.data 
+          : (rolesRes.data.data.data || []);
+      } else if (Array.isArray(rolesRes.data)) {
+        roleData = rolesRes.data;
+      }
+      
+      console.log('Extracted users:', userData);
+      console.log('Extracted roles:', roleData);
+      
+      setUsers(userData);
+      setRoles(roleData);
+    } catch (error: any) {
       console.error('Failed to fetch data:', error);
+      console.error('Error response:', error.response?.data);
+      alert('Failed to load users: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -69,26 +98,42 @@ export default function UserManagementPage() {
     e.preventDefault();
     setSaving(true);
     try {
+      console.log('Submitting user data:', formData);
+      
+      let response;
       if (editingUser) {
-        await axiosInstance.put(`/admin/users/${editingUser.id}`, {
+        console.log('Updating user:', editingUser.id);
+        response = await axiosInstance.put(`/admin/users/${editingUser.id}`, {
           name: formData.name,
           email: formData.email,
           ...(formData.password && { password: formData.password }),
           ...(formData.role_id && { role_id: parseInt(formData.role_id) }),
         });
       } else {
-        await axiosInstance.post('/admin/users', {
+        console.log('Creating new user');
+        response = await axiosInstance.post('/admin/users', {
           name: formData.name,
           email: formData.email,
           password: formData.password,
           ...(formData.role_id && { role_id: parseInt(formData.role_id) }),
         });
       }
+      
+      console.log('Save response:', response.data);
+      
       await fetchData();
       setShowModal(false);
+      alert(editingUser ? 'User updated successfully!' : 'User created successfully!');
     } catch (error: any) {
       console.error('Failed to save user:', error);
-      alert(error.response?.data?.message || 'Failed to save user');
+      console.error('Error response:', error.response?.data);
+      
+      const errorMsg = error.response?.data?.message 
+        || error.response?.data?.errors 
+        || error.message 
+        || 'Failed to save user';
+      
+      alert(typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg);
     } finally {
       setSaving(false);
     }

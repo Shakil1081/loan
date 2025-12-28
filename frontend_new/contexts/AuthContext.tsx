@@ -42,24 +42,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    const response = await axiosInstance.post<AuthResponse>('/login', { email, password });
-    localStorage.setItem('token', response.data.access_token);
-    localStorage.setItem('user', JSON.stringify(response.data.user));
-    setUser(response.data.user);
-    router.push('/dashboard');
+    try {
+      const response = await axiosInstance.post('/login', { email, password });
+      console.log('Login response:', response.data);
+      
+      const { data } = response.data; // ResponseService wraps data in { success, message, data }
+      console.log('Extracted data:', data);
+      
+      if (data && data.token && data.user) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
+        console.log('User set, redirecting to dashboard');
+        router.push('/dashboard');
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
   const register = async (name: string, email: string, password: string, password_confirmation: string) => {
-    const response = await axiosInstance.post<AuthResponse>('/register', {
-      name,
-      email,
-      password,
-      password_confirmation,
-    });
-    localStorage.setItem('token', response.data.access_token);
-    localStorage.setItem('user', JSON.stringify(response.data.user));
-    setUser(response.data.user);
-    router.push('/dashboard');
+    try {
+      const response = await axiosInstance.post('/register', {
+        name,
+        email,
+        password,
+        password_confirmation,
+      });
+      console.log('Register response:', response.data);
+      
+      const { data } = response.data; // ResponseService wraps data in { success, message, data }
+      console.log('Extracted data:', data);
+      
+      if (data && data.token && data.user) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
+        console.log('User registered, redirecting to dashboard');
+        router.push('/dashboard');
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
   };
 
   const logout = () => {

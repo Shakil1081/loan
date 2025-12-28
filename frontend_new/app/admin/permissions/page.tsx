@@ -30,7 +30,18 @@ export default function PermissionManagementPage() {
   const fetchPermissions = async () => {
     try {
       const response = await axiosInstance.get('/admin/permissions');
-      setPermissions(response.data.data || response.data || []);
+      
+      // Handle ResponseService format with pagination: { success: true, data: { data: [...], ... } }
+      let permsData = [];
+      if (response.data.data) {
+        permsData = Array.isArray(response.data.data) 
+          ? response.data.data 
+          : (response.data.data.data || []);
+      } else if (Array.isArray(response.data)) {
+        permsData = response.data;
+      }
+      
+      setPermissions(permsData);
     } catch (error) {
       console.error('Failed to fetch permissions:', error);
     } finally {

@@ -36,8 +36,28 @@ export default function RoleManagementPage() {
         axiosInstance.get('/admin/roles'),
         axiosInstance.get('/admin/permissions'),
       ]);
-      setRoles(rolesRes.data.data || rolesRes.data || []);
-      setPermissions(permsRes.data.data || permsRes.data || []);
+      
+      // Handle ResponseService format with pagination: { success: true, data: { data: [...], ... } }
+      let rolesData = [];
+      if (rolesRes.data.data) {
+        rolesData = Array.isArray(rolesRes.data.data) 
+          ? rolesRes.data.data 
+          : (rolesRes.data.data.data || []);
+      } else if (Array.isArray(rolesRes.data)) {
+        rolesData = rolesRes.data;
+      }
+      
+      let permsData = [];
+      if (permsRes.data.data) {
+        permsData = Array.isArray(permsRes.data.data) 
+          ? permsRes.data.data 
+          : (permsRes.data.data.data || []);
+      } else if (Array.isArray(permsRes.data)) {
+        permsData = permsRes.data;
+      }
+      
+      setRoles(rolesData);
+      setPermissions(permsData);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {

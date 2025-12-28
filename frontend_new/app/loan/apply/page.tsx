@@ -31,7 +31,7 @@ export default function ApplyLoanPage() {
     setLoading(true);
 
     try {
-      await axiosInstance.post('/loans', {
+      await axiosInstance.post('/loans/apply', {
         amount: parseFloat(formData.amount),
         tenure: formData.tenure,
         purpose: formData.purpose,

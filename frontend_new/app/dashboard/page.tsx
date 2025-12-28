@@ -94,7 +94,7 @@ export default function DashboardPage() {
       icon: DollarSign,
       href: '/loans/my',
       color: 'from-emerald-500 to-teal-600',
-      show: hasPermission('loan.view'),
+      show: true, // All authenticated users can view their own loans
     },
     {
       title: 'Manage Users',

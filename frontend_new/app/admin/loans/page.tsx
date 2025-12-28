@@ -30,7 +30,18 @@ export default function AdminLoansPage() {
   const fetchLoans = async () => {
     try {
       const response = await axiosInstance.get('/admin/loans');
-      setLoans(response.data.data || []);
+      
+      // Handle ResponseService format with pagination: { success: true, data: { data: [...], ... } }
+      let loansData = [];
+      if (response.data.data) {
+        loansData = Array.isArray(response.data.data) 
+          ? response.data.data 
+          : (response.data.data.data || []);
+      } else if (Array.isArray(response.data)) {
+        loansData = response.data;
+      }
+      
+      setLoans(loansData);
     } catch (error) {
       console.error('Failed to fetch loans:', error);
     } finally {
@@ -46,15 +57,17 @@ export default function AdminLoansPage() {
       setRejectingLoan(true);
     }
     try {
-      await axiosInstance.put(`/admin/loans/${selectedLoan.id}/status`, {
+      await axiosInstance.patch(`/admin/loans/${selectedLoan.id}/status`, {
         status,
         admin_comment: adminComment,
       });
       await fetchLoans();
       setSelectedLoan(null);
       setAdminComment('');
-    } catch (error) {
+      alert(`Loan ${status.toLowerCase()} successfully!`);
+    } catch (error: any) {
       console.error('Failed to update loan:', error);
+      alert(error.response?.data?.message || 'Failed to update loan status');
     } finally {
       setApprovingLoan(false);
       setRejectingLoan(false);
