@@ -31,7 +31,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token) {
       try {
         const response = await axiosInstance.get('/me');
-        setUser(response.data);
+        const userData = response.data.data || response.data; // Handle both formats
+        setUser(userData);
       } catch (error) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');

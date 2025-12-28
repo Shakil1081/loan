@@ -41,7 +41,7 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     try {
-      const endpoint = hasPermission('loan.approve') ? '/admin/loans' : '/loans/my-loans';
+      const endpoint = hasPermission('loan.approve') ? '/admin/loans' : '/loans';
       const response = await axiosInstance.get(endpoint);
       const loanData = response.data.data || [];
       setLoans(loanData.slice(0, 5));
